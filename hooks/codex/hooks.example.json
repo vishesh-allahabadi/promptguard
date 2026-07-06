@@ -1,0 +1,7 @@
+{
+  "description": "Example only. Adapt hook names and paths to your local Codex version.",
+  "prompt_submit": {
+    "command": "python /absolute/path/to/promptguard/hooks/codex/promptguard_hook.py"
+  }
+}
+

@@ -1,0 +1,7 @@
+{
+  "description": "Example only. Adapt hook names and paths to your local Claude Code version.",
+  "prompt_submit": {
+    "command": "python /absolute/path/to/promptguard/hooks/claude-code/promptguard_hook.py"
+  }
+}
+

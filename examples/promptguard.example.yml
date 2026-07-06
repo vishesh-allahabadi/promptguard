@@ -1,0 +1,13 @@
+customer_names:
+  - Jane Rao
+  - Arjun Mehta
+company_names:
+  - Internal Labs
+  - BigDoor Demo Co
+client_names:
+  - Acme Retail
+  - Northstar Clinic
+confidential_terms:
+  - Project Sundial
+  - board-only pricing
+

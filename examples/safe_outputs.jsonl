@@ -1,0 +1,11 @@
+{"id":"ex001","safe_text":"Debug this OpenAI request. The key in the header is [SECRET_REMOVED]."}
+{"id":"ex004","safe_text":"Production payment provider live key [SECRET_REMOVED] is returning auth errors."}
+{"id":"ex007","safe_text":"Production database connection failed: [DATABASE_URL_REMOVED]"}
+{"id":"ex011","safe_text":"Customer [EMAIL] cannot download the invoice."}
+{"id":"ex017","safe_text":"The refund amount is around ₹3.5 lakh and the invoice sync is wrong."}
+{"id":"ex022","safe_text":"On around July 2026 the deployment failed after the migration."}
+{"id":"ex025","safe_text":"The payroll row for [EMAIL] has salary around $9.8k."}
+{"id":"ex032","safe_text":"Mongo connection [DATABASE_URL_REMOVED] is pasted here."}
+{"id":"ex036","safe_text":"Payment webhook for [IP_ADDRESS] includes refund around $1.2k and card error text."}
+{"id":"ex040","safe_text":"Customer mail [EMAIL] and phone [PHONE] are in the production incident."}
+
