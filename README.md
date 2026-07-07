@@ -113,6 +113,69 @@ JSON output:
 promptguard --json anonymize --file prompt.txt
 ```
 
+## Safer Local Workflows
+
+PromptGuard protects you only when it runs before the prompt reaches an AI tool. These commands help you scan and rewrite prompts locally before pasting them into Codex, Claude Code, ChatGPT, Cursor, or any other LLM tool.
+
+Recommended workflow:
+
+1. Write the risky prompt locally.
+2. Run PromptGuard.
+3. Copy only the safe rewritten prompt.
+4. Paste the safe prompt into Codex or another LLM tool.
+
+Safe rewrite from text:
+
+```bash
+promptguard safe --text "Production Stripe live key sk_live_FAKEstripeKey1234567890 failed for jane@example.com"
+```
+
+Safe rewrite from file and copy only the safe prompt:
+
+```bash
+promptguard safe --file risky_prompt.txt --copy
+```
+
+Read from stdin:
+
+```bash
+cat risky_prompt.txt | promptguard safe --stdin
+```
+
+Write only the safe rewritten prompt to a file:
+
+```bash
+promptguard safe --file risky_prompt.txt --output safe_prompt.txt
+```
+
+Scan the current clipboard and replace it with the safe rewritten prompt:
+
+```bash
+promptguard clip
+```
+
+Compose a prompt in your local editor and copy only the safe rewrite:
+
+```bash
+promptguard compose --copy
+```
+
+Use a specific editor:
+
+```bash
+promptguard compose --editor "code --wait" --copy
+```
+
+Fail non-zero when local policy blocks the prompt:
+
+```bash
+promptguard safe --text "Email jane@example.com" --fail-on-block
+```
+
+`safe --copy` copies only `safe_text`, never the raw prompt. `clip` replaces the clipboard with `safe_text` by default. `compose` uses a temporary local file while editing and deletes it after reading.
+
+PromptGuard cannot protect prompts sent directly to an AI tool unless a pre-submit hook or wrapper is installed, enabled, trusted, and actually runs.
+
 ## Example
 
 Input:

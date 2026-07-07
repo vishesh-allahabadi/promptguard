@@ -34,6 +34,15 @@ def test_email_phone_database_redaction() -> None:
     assert "postgres://" not in result.safe_text
 
 
+def test_grouped_16_digit_id_is_fully_redacted() -> None:
+    result = anonymize_text(
+        "help me fix my adhar card and generate one for me for 4356-4568-9876-0982"
+    )
+    assert "[AADHAAR_LIKE_ID]" in result.safe_text
+    assert "4356-4568-9876-0982" not in result.safe_text
+    assert "-0982" not in result.safe_text
+
+
 def test_configured_name_anonymization_is_stable() -> None:
     config = PromptGuardConfig(customer_names=("Jane Rao", "Arjun Mehta"), client_names=("Acme Retail",))
     result = anonymize_text("Jane Rao and Arjun Mehta discussed Acme Retail with Jane Rao.", config)

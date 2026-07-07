@@ -10,9 +10,18 @@ from pathlib import Path
 from typing import Any
 
 from .anonymizer import anonymize_text
+from .clipboard import PromptGuardClipboardError
 from .config import load_config
 from .scanner import scan_text
 from .types import PromptGuardConfig, RiskLevel
+from .workflows import (
+    PromptGuardWorkflowError,
+    WorkflowResult,
+    load_local_workflow_config,
+    run_clip_workflow,
+    run_compose_workflow,
+    run_safe_workflow,
+)
 
 HOOK_WRAPPER = '''#!/usr/bin/env python3
 from __future__ import annotations
@@ -42,6 +51,26 @@ def main(argv: list[str] | None = None) -> int:
         source.add_argument("--text")
         source.add_argument("--file")
 
+    safe = subparsers.add_parser("safe")
+    safe_source = safe.add_mutually_exclusive_group(required=True)
+    safe_source.add_argument("--text")
+    safe_source.add_argument("--file")
+    safe_source.add_argument("--stdin", action="store_true")
+    safe.add_argument("--copy", action="store_true", help="Copy only the safe rewritten prompt.")
+    safe.add_argument("--output", help="Write only the safe rewritten prompt to this file.")
+    safe.add_argument("--fail-on-block", action="store_true", help="Exit non-zero when policy blocks the prompt.")
+
+    clip = subparsers.add_parser("clip")
+    clip.add_argument("--copy", action="store_true", help="Accepted for clarity; clip copies by default.")
+    clip.add_argument("--print", dest="print_safe", action="store_true", help="Print the safe rewritten prompt.")
+    clip.add_argument("--fail-on-block", action="store_true", help="Exit non-zero when policy blocks the prompt.")
+
+    compose = subparsers.add_parser("compose")
+    compose.add_argument("--copy", action="store_true", help="Copy only the safe rewritten prompt.")
+    compose.add_argument("--output", help="Write only the safe rewritten prompt to this file.")
+    compose.add_argument("--editor", help='Editor command, for example "code --wait".')
+    compose.add_argument("--fail-on-block", action="store_true", help="Exit non-zero when policy blocks the prompt.")
+
     check = subparsers.add_parser("check")
     check.add_argument("--file", required=True)
 
@@ -70,6 +99,40 @@ def main(argv: list[str] | None = None) -> int:
         _print_payload(result.to_dict(), args.json)
         return 1 if result.scan.risk_level is RiskLevel.CRITICAL else 0
 
+    if args.command == "safe":
+        workflow_config = load_local_workflow_config(args.config)
+        text = _read_safe_source(args)
+        return _run_local_command(
+            lambda: run_safe_workflow(text, workflow_config, copy=args.copy, output=args.output),
+            as_json=args.json,
+            fail_on_block=args.fail_on_block,
+            print_safe=True,
+        )
+
+    if args.command == "clip":
+        workflow_config = load_local_workflow_config(args.config)
+        return _run_local_command(
+            lambda: run_clip_workflow(workflow_config, copy=True),
+            as_json=args.json,
+            fail_on_block=args.fail_on_block,
+            print_safe=args.print_safe,
+            prefix="Safe rewritten prompt copied to clipboard.",
+        )
+
+    if args.command == "compose":
+        workflow_config = load_local_workflow_config(args.config)
+        return _run_local_command(
+            lambda: run_compose_workflow(
+                workflow_config,
+                editor=args.editor,
+                copy=args.copy,
+                output=args.output,
+            ),
+            as_json=args.json,
+            fail_on_block=args.fail_on_block,
+            print_safe=True,
+        )
+
     if args.command == "test-examples":
         return _test_examples(config, args.json)
 
@@ -86,6 +149,55 @@ def _read_source(args: argparse.Namespace) -> str:
     if args.text is not None:
         return args.text
     return Path(args.file).read_text(encoding="utf-8")
+
+
+def _read_safe_source(args: argparse.Namespace) -> str:
+    if args.text is not None:
+        return args.text
+    if args.file is not None:
+        return Path(args.file).read_text(encoding="utf-8")
+    return sys.stdin.read()
+
+
+def _run_local_command(
+    runner,
+    *,
+    as_json: bool,
+    fail_on_block: bool,
+    print_safe: bool,
+    prefix: str | None = None,
+) -> int:
+    try:
+        result = runner()
+    except (PromptGuardClipboardError, PromptGuardWorkflowError, OSError) as exc:
+        if as_json:
+            print(json.dumps({"error": str(exc)}, indent=2, sort_keys=True))
+        else:
+            print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    if prefix and not as_json:
+        print(prefix)
+    _print_workflow_result(result, as_json, print_safe=print_safe)
+    return 1 if fail_on_block and result.blocked else 0
+
+
+def _print_workflow_result(result: WorkflowResult, as_json: bool, *, print_safe: bool) -> None:
+    payload = result.to_dict()
+    if as_json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+
+    print("PromptGuard result")
+    print(f"risk: {result.risk_level}")
+    print(f"policy: {result.policy}")
+    print(f"categories: {', '.join(result.categories) if result.categories else 'none'}")
+    if print_safe:
+        print("\nsafe rewritten prompt:")
+        print(result.safe_text)
+    print(f"\ncopied_to_clipboard: {str(result.copied_to_clipboard).lower()}")
+    if result.output_file:
+        print(f"output_file: {result.output_file}")
 
 
 def _print_payload(payload: dict[str, Any], as_json: bool) -> None:

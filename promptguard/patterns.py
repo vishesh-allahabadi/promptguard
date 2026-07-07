@@ -169,7 +169,7 @@ PII_RULES: tuple[PatternRule, ...] = (
     PatternRule(
         "aadhaar_like_id",
         "Aadhaar-like ID",
-        r"(?<!\d)\d{4}[\s-]?\d{4}[\s-]?\d{4}(?!\d)",
+        r"(?<!\d)\d{4}(?:[\s-]?\d{4}){2,3}(?![\s-]?\d)",
         RiskLevel.HIGH,
         "[AADHAAR_LIKE_ID]",
     ),
