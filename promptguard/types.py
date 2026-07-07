@@ -21,6 +21,9 @@ class Action(str, Enum):
 
 @dataclass(frozen=True)
 class PromptGuardConfig:
+    mode: str | None = None
+    block_on: tuple[RiskLevel, ...] = ()
+    warn_on: tuple[RiskLevel, ...] = ()
     customer_names: tuple[str, ...] = ()
     company_names: tuple[str, ...] = ()
     client_names: tuple[str, ...] = ()
@@ -81,4 +84,3 @@ class AnonymizeResult:
         data["safe_text"] = self.safe_text
         data["mapping_count"] = self.mapping_count
         return data
-

@@ -154,6 +154,42 @@ Then run:
 promptguard --config examples/promptguard.example.yml anonymize --file prompt.txt
 ```
 
+## Codex Pre-Submit Protection
+
+PromptGuard can protect Codex prompts only when it runs before submission. The Codex skill is useful guidance, but it is not a privacy boundary. The real pre-submit guardrail is the Codex `UserPromptSubmit` hook.
+
+Install the repo-local hook:
+
+```bash
+promptguard install-codex-hook
+```
+
+Then in Codex, review and trust the hook if prompted, or run `/hooks`. The hook only works when Codex hooks are installed, enabled, trusted, and actually executed for this repo/config layer.
+
+Test safely with a fake secret prompt:
+
+```text
+OPENAI_API_KEY=sk-FAKEopenaiKey1234567890abcd
+```
+
+Expected behavior: PromptGuard blocks the prompt before submission and shows a safe rewritten version containing `[SECRET_REMOVED]`.
+
+PromptGuard cannot protect prompts typed directly into an AI tool if the hook is not installed, enabled, and trusted.
+
+Example `.promptguard.yml` policy:
+
+```yaml
+block_on:
+  - CRITICAL
+  - HIGH
+warn_on:
+  - MEDIUM
+confidential_terms:
+  - Project Sundial
+client_names:
+  - Acme Retail
+```
+
 ## Hook Usage
 
 Hook templates are included for Codex and Claude Code:
@@ -164,6 +200,8 @@ Hook templates are included for Codex and Claude Code:
 - `hooks/claude-code/promptguard_hook.py`
 
 Exact hook schemas can change. Treat these files as local templates and adapt paths for your installed Codex or Claude Code version.
+
+See `docs/codex_pre_submit_hook.md` for the production-oriented Codex hook details.
 
 ## Skill Usage
 

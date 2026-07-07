@@ -2,13 +2,32 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
 from .anonymizer import anonymize_text
+from .config import load_config
 from .scanner import scan_text
 from .types import PromptGuardConfig, RiskLevel
+
+HOOK_WRAPPER = '''#!/usr/bin/env python3
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from promptguard.codex_hook import main
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+'''
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -27,9 +46,11 @@ def main(argv: list[str] | None = None) -> int:
     check.add_argument("--file", required=True)
 
     subparsers.add_parser("test-examples")
+    subparsers.add_parser("install-codex-hook")
+    subparsers.add_parser("doctor")
 
     args = parser.parse_args(argv)
-    config = _load_config(args.config)
+    config = load_config(args.config)
 
     if args.command == "scan":
         text = _read_source(args)
@@ -52,6 +73,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "test-examples":
         return _test_examples(config, args.json)
 
+    if args.command == "install-codex-hook":
+        return _install_codex_hook()
+
+    if args.command == "doctor":
+        return _doctor()
+
     return 2
 
 
@@ -59,35 +86,6 @@ def _read_source(args: argparse.Namespace) -> str:
     if args.text is not None:
         return args.text
     return Path(args.file).read_text(encoding="utf-8")
-
-
-def _load_config(path: str | None) -> PromptGuardConfig:
-    if path is None:
-        return PromptGuardConfig()
-    data = _parse_simple_yaml(Path(path).read_text(encoding="utf-8"))
-    return PromptGuardConfig(
-        customer_names=tuple(data.get("customer_names", ()) or ()),
-        company_names=tuple(data.get("company_names", ()) or ()),
-        client_names=tuple(data.get("client_names", ()) or ()),
-        confidential_terms=tuple(data.get("confidential_terms", ()) or ()),
-    )
-
-
-def _parse_simple_yaml(raw: str) -> dict[str, list[str]]:
-    data: dict[str, list[str]] = {}
-    current: str | None = None
-    for line in raw.splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        if not line.startswith(" ") and stripped.endswith(":"):
-            current = stripped[:-1]
-            data[current] = []
-            continue
-        if current and stripped.startswith("- "):
-            value = stripped[2:].strip().strip('"').strip("'")
-            data[current].append(value)
-    return data
 
 
 def _print_payload(payload: dict[str, Any], as_json: bool) -> None:
@@ -134,6 +132,91 @@ def _test_examples(config: PromptGuardConfig, as_json: bool) -> int:
     payload = {"examples": count, "failures": failures, "passed": not failures}
     _print_payload(payload, as_json)
     return 1 if failures else 0
+
+
+def _install_codex_hook() -> int:
+    root = _git_root(Path.cwd())
+    codex_dir = root / ".codex"
+    hooks_dir = codex_dir / "hooks"
+    hooks_json = codex_dir / "hooks.json"
+    hook_path = hooks_dir / "promptguard_user_prompt_submit.py"
+
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+    hook_path.write_text(HOOK_WRAPPER, encoding="utf-8")
+    hook_path.chmod(0o755)
+
+    data: dict[str, Any] = {}
+    if hooks_json.exists():
+        try:
+            data = json.loads(hooks_json.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            data = {}
+    hooks = data.setdefault("hooks", {})
+    prompt_hooks = hooks.setdefault("UserPromptSubmit", [])
+    command = '/usr/bin/env python3 "$(git rev-parse --show-toplevel)/.codex/hooks/promptguard_user_prompt_submit.py"'
+    hook_entry = {
+        "type": "command",
+        "command": command,
+        "statusMessage": "PromptGuard is checking prompt privacy",
+    }
+    already_present = False
+    for group in prompt_hooks:
+        for nested in group.get("hooks", []):
+            if isinstance(nested, dict) and "promptguard_user_prompt_submit.py" in nested.get("command", ""):
+                nested.update(hook_entry)
+                already_present = True
+    if not already_present:
+        prompt_hooks.append({"hooks": [hook_entry]})
+    hooks_json.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    print(f"Installed PromptGuard Codex hook at {hook_path}")
+    print(f"Updated {hooks_json}")
+    print("Codex may require you to review and trust this hook using /hooks before it runs.")
+    print("This protects only prompts submitted through Codex in this repo/config layer when hooks are enabled and trusted.")
+    return 0
+
+
+def _doctor() -> int:
+    root = _git_root(Path.cwd())
+    hooks_json = root / ".codex" / "hooks.json"
+    hook_path = root / ".codex" / "hooks" / "promptguard_user_prompt_submit.py"
+    config_path = root / ".promptguard.yml"
+    print("PromptGuard doctor")
+    print(f"version: {_version()}")
+    print(f"python_executable: {sys.executable}")
+    print(f"python_version: {sys.version.split()[0]}")
+    print(f"cwd: {Path.cwd()}")
+    print(f"repo_root: {root}")
+    print(f"hooks_json_exists: {hooks_json.exists()}")
+    print(f"hook_script_exists: {hook_path.exists()}")
+    print(f"promptguard_config_exists: {config_path.exists()}")
+    print(f"hook_files_present: {hooks_json.exists() and hook_path.exists()}")
+    print("Codex may require you to review and trust this hook using /hooks before it runs.")
+    return 0 if hooks_json.exists() and hook_path.exists() else 1
+
+
+def _git_root(cwd: Path) -> Path:
+    git = shutil.which("git")
+    if git:
+        result = subprocess.run(
+            [git, "rev-parse", "--show-toplevel"],
+            cwd=cwd,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return Path(result.stdout.strip())
+    return cwd
+
+
+def _version() -> str:
+    try:
+        from importlib.metadata import version
+
+        return version("promptguard")
+    except Exception:
+        return "unknown"
 
 
 if __name__ == "__main__":
