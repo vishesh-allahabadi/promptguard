@@ -41,3 +41,15 @@ def test_configured_name_anonymization_is_stable() -> None:
     assert "Person B" in result.safe_text
     assert "Client A" in result.safe_text
 
+
+def test_configured_confidential_terms_are_anonymized_consistently() -> None:
+    config = PromptGuardConfig(confidential_terms=("Project Sundial", "Project Atlas"))
+    result = anonymize_text(
+        "Project Sundial failed, then Project Atlas paused Project Sundial.",
+        config,
+    )
+    assert "configured_confidential_term" in result.scan.categories
+    assert "Project Sundial" not in result.safe_text
+    assert "Project Atlas" not in result.safe_text
+    assert result.safe_text.count("Confidential Term A") == 2
+    assert "Confidential Term B" in result.safe_text

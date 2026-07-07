@@ -21,6 +21,38 @@ PromptGuard gives developers a local checkpoint before that content is sent anyw
 - Provides CLI commands and hook templates for coding-agent workflows.
 - Avoids external APIs, telemetry, analytics, cloud services, and permanent raw prompt storage.
 
+## See It Working In 20 Seconds
+
+```bash
+python -m pip install -e ".[dev]"
+promptguard anonymize --text "Production Stripe live key sk_live_FAKEstripeKey1234567890 failed for jane@example.com on invoice $12,430"
+```
+
+Expected output conceptually:
+
+```text
+risk: CRITICAL
+action: block
+categories: email, financial_amount, financial_context, production_indicator, stripe_key
+
+safe rewritten prompt:
+Production payment provider live key [SECRET_REMOVED] failed for [EMAIL] on invoice around $12k
+```
+
+Check a harmless prompt:
+
+```bash
+promptguard scan --text "How do I refactor this harmless Python function?"
+```
+
+Expected:
+
+```text
+risk: LOW
+action: allow
+categories: none
+```
+
 ## What It Does Not Do
 
 - It does not guarantee privacy, security, or compliance.
@@ -179,5 +211,4 @@ Contributions are welcome when they preserve the project principles:
 
 ## Security Disclosure
 
-If you find a security issue, please do not open a public issue containing secrets or exploit details. Create a minimal report with safe placeholders and contact the maintainers through the repository security policy once one is published.
-
+If you find a security issue, please do not open a public issue containing secrets or exploit details. Create a minimal report with safe placeholders and follow the guidance in `SECURITY.md`.

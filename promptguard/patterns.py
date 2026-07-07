@@ -42,6 +42,72 @@ SECRET_RULES: tuple[PatternRule, ...] = (
         "[SECRET_REMOVED]",
     ),
     PatternRule(
+        "google_api_key",
+        "Google API key",
+        r"\bAIza[0-9A-Za-z_-]{35}\b",
+        RiskLevel.CRITICAL,
+        "[SECRET_REMOVED]",
+    ),
+    PatternRule(
+        "slack_token",
+        "Slack token",
+        r"\bxox(?:b|p|o|a|r|s)-[0-9A-Za-z-]{20,}\b",
+        RiskLevel.CRITICAL,
+        "[SECRET_REMOVED]",
+    ),
+    PatternRule(
+        "resend_api_key",
+        "Resend API key",
+        r"\bre_[A-Za-z0-9_-]{20,}\b",
+        RiskLevel.CRITICAL,
+        "[SECRET_REMOVED]",
+    ),
+    PatternRule(
+        "twilio_account_sid",
+        "Twilio account SID",
+        r"\bAC[a-fA-F0-9]{32}\b",
+        RiskLevel.CRITICAL,
+        "[SECRET_REMOVED]",
+    ),
+    PatternRule(
+        "twilio_auth_token_like",
+        "Twilio auth token-like value",
+        r"(?i)\btwilio[_-]?auth[_-]?token\b\s*[:=]\s*['\"]?[a-f0-9]{32}\b",
+        RiskLevel.CRITICAL,
+        "[SECRET_REMOVED]",
+    ),
+    PatternRule(
+        "vercel_token",
+        "Vercel token",
+        r"\bvercel_[A-Za-z0-9_-]{20,}\b",
+        RiskLevel.CRITICAL,
+        "[SECRET_REMOVED]",
+    ),
+    PatternRule(
+        "cloudflare_api_token",
+        "Cloudflare API token",
+        r"(?i)\bcloudflare[_-]?(?:api[_-]?)?token\b\s*[:=]\s*['\"]?[A-Za-z0-9_-]{20,}\b",
+        RiskLevel.CRITICAL,
+        "[SECRET_REMOVED]",
+    ),
+    # Conservative Supabase matching: classify project URLs and explicit anon/service-role JWT-like keys.
+    PatternRule(
+        "supabase_key_or_url",
+        "Supabase key or project URL",
+        r"\bhttps://[a-z0-9]{20}\.supabase\.co\b|\bsupabase_(?:anon|service_role)_key\b\s*[:=]\s*['\"]?[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}",
+        RiskLevel.CRITICAL,
+        "[SECRET_REMOVED]",
+        re.IGNORECASE,
+    ),
+    # Conservative JWT matching: all three base64url parts must be long enough to avoid ordinary dotted strings.
+    PatternRule(
+        "jwt_token",
+        "JWT token",
+        r"\beyJ[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b",
+        RiskLevel.CRITICAL,
+        "[SECRET_REMOVED]",
+    ),
+    PatternRule(
         "private_key_block",
         "Private key block",
         r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
@@ -184,7 +250,7 @@ def configured_rules(config: PromptGuardConfig | None) -> tuple[PatternRule, ...
         ("customer_name", config.customer_names, "[PERSON]", RiskLevel.HIGH),
         ("company_name", config.company_names, "[COMPANY]", RiskLevel.MEDIUM),
         ("client_name", config.client_names, "[CLIENT]", RiskLevel.HIGH),
-        ("configured_confidential_term", config.confidential_terms, "", RiskLevel.HIGH),
+        ("configured_confidential_term", config.confidential_terms, "[CONFIDENTIAL_TERM]", RiskLevel.HIGH),
     ):
         for name in names:
             clean = name.strip()

@@ -50,3 +50,34 @@ def test_configured_names_are_detected() -> None:
     assert {"customer_name", "client_name", "company_name", "configured_confidential_term"} <= set(result.categories)
     assert result.risk_level is RiskLevel.HIGH
 
+
+def test_detects_additional_secret_patterns() -> None:
+    samples = {
+        "google_api_key": "AIzaFAKEgoogleApiKey1234567890abcdefghi",
+        "slack_token": "xoxb-" + "123456789012-123456789012-FAKEslackTokenabcd",
+        "supabase_key_or_url": "https://abcdefghijklmnopqrst.supabase.co",
+        "resend_api_key": "re_FAKEresendApiKey1234567890",
+        "twilio_account_sid": "AC" + "0123456789abcdef0123456789abcdef",
+        "twilio_auth_token_like": "TWILIO_AUTH_TOKEN=0123456789abcdef0123456789abcdef",
+        "vercel_token": "vercel_FAKEvercelToken1234567890",
+        "cloudflare_api_token": "CLOUDFLARE_API_TOKEN=FAKEcloudflareToken1234567890",
+        "jwt_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmYWtlLXVzZXIiLCJzY29wZSI6InRlc3Qtb25seSJ9.FAKEsignaturePart1234567890abcd",
+    }
+    for category, text in samples.items():
+        result = scan_text(text)
+        assert category in result.categories
+        assert result.risk_level is RiskLevel.CRITICAL
+        assert result.action.value == "block"
+
+
+def test_additional_secret_patterns_do_not_flag_harmless_code_as_critical() -> None:
+    text = """
+def build_url(host):
+    return f"https://{host}.example.com"
+
+parts = "header.payload"
+token_prefix = "vercel"
+cloudflare = {"enabled": False}
+"""
+    result = scan_text(text)
+    assert result.risk_level is RiskLevel.LOW

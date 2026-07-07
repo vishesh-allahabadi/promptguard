@@ -32,6 +32,8 @@ def _replacement_for(original: str, finding: Finding, mapping: dict[str, str]) -
         return _stable_label(original, mapping, "Company")
     if finding.category == "client_name":
         return _stable_label(original, mapping, "Client")
+    if finding.category == "configured_confidential_term":
+        return _stable_label(original, mapping, "Confidential Term")
     if finding.category == "email":
         return "[EMAIL]"
     if finding.category == "phone":
@@ -85,4 +87,3 @@ def _rewrite_sensitive_phrases(text: str) -> str:
     text = re.sub(r"(?i)\bOpenAI\s+(?:api\s+)?key\b", "AI provider key", text)
     text = re.sub(r"(?i)\bAnthropic\s+(?:api\s+)?key\b", "AI provider key", text)
     return text
-
