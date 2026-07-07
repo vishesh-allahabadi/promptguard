@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "PromptGuard",
+  "version": "0.1.0",
+  "description": "Local-first prompt privacy guardrail for AI text boxes.",
+  "permissions": ["storage"],
+  "options_page": "options/options.html",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://*.openai.com/*",
+        "https://codex.openai.com/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": ["src/content.js"],
+      "css": ["src/styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/engine.js", "src/overlay.js", "src/settings.js"],
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://*.openai.com/*",
+        "https://codex.openai.com/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ]
+    }
+  ]
+}

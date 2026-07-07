@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PromptGuard Settings</title>
+    <link rel="stylesheet" href="options.css">
+  </head>
+  <body>
+    <main class="settings-shell">
+      <header>
+        <h1>PromptGuard Settings</h1>
+        <p>Settings are stored locally in your browser. PromptGuard does not send prompt text or settings to a server.</p>
+      </header>
+
+      <form id="settings-form">
+        <section>
+          <label class="check-row">
+            <input type="checkbox" name="enabled">
+            <span>Enable live prompt scanning</span>
+          </label>
+          <label class="check-row">
+            <input type="checkbox" name="allowSendAnyway">
+            <span>Allow one-time Send Anyway override</span>
+          </label>
+        </section>
+
+        <section class="grid">
+          <fieldset>
+            <legend>Block on</legend>
+            <label><input type="checkbox" name="blockOn" value="CRITICAL"> Critical</label>
+            <label><input type="checkbox" name="blockOn" value="HIGH"> High</label>
+            <label><input type="checkbox" name="blockOn" value="MEDIUM"> Medium</label>
+          </fieldset>
+          <fieldset>
+            <legend>Warn on</legend>
+            <label><input type="checkbox" name="warnOn" value="HIGH"> High</label>
+            <label><input type="checkbox" name="warnOn" value="MEDIUM"> Medium</label>
+            <label><input type="checkbox" name="warnOn" value="LOW"> Low</label>
+          </fieldset>
+        </section>
+
+        <section class="textareas">
+          <label>Customer names<textarea name="customerNames" rows="5" placeholder="One per line"></textarea></label>
+          <label>Client names<textarea name="clientNames" rows="5" placeholder="One per line"></textarea></label>
+          <label>Company names<textarea name="companyNames" rows="5" placeholder="One per line"></textarea></label>
+          <label>Confidential terms<textarea name="confidentialTerms" rows="5" placeholder="One per line"></textarea></label>
+        </section>
+
+        <div class="actions">
+          <button type="submit">Save Settings</button>
+          <button type="button" id="reset">Reset Defaults</button>
+          <span id="status" role="status"></span>
+        </div>
+      </form>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

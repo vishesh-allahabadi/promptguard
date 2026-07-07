@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PromptGuard Extension Demo</title>
+    <style>
+      body {
+        margin: 0;
+        color: #111827;
+        background: #f8fafc;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 36px 20px 64px;
+      }
+      h1 {
+        margin: 0 0 10px;
+      }
+      p {
+        color: #4b5563;
+      }
+      .panel {
+        margin-top: 22px;
+        padding: 18px;
+        background: #ffffff;
+        border: 1px solid #dbe2ea;
+        border-radius: 8px;
+      }
+      textarea,
+      [contenteditable] {
+        width: 100%;
+        min-height: 150px;
+        box-sizing: border-box;
+        padding: 14px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font: 15px/1.5 ui-sans-serif, system-ui, sans-serif;
+        background: #ffffff;
+      }
+      .buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 12px;
+      }
+      button {
+        min-height: 36px;
+        padding: 8px 12px;
+        border: 1px solid #111827;
+        border-radius: 6px;
+        background: #111827;
+        color: #ffffff;
+        font-weight: 800;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: #ffffff;
+        color: #111827;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>PromptGuard Extension Demo</h1>
+      <p>Load the unpacked extension from the <code>browser-extension</code> folder, then type or insert fake risky prompts below. The extension should scan locally and warn before sending.</p>
+
+      <section class="panel">
+        <h2>Textarea prompt box</h2>
+        <textarea id="prompt" placeholder="Write a prompt here"></textarea>
+        <div class="buttons">
+          <button type="button" data-fill="stripe">Stripe key + email</button>
+          <button type="button" data-fill="database">Database URL</button>
+          <button type="button" data-fill="jwt">JWT</button>
+          <button type="button" data-fill="configured">Client/confidential term</button>
+          <button type="button" aria-label="Send prompt">Send Prompt</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Contenteditable prompt box</h2>
+        <div id="editable" contenteditable="true" role="textbox" aria-label="Editable prompt"></div>
+        <div class="buttons">
+          <button type="button" class="secondary" data-fill-editable="stripe">Insert risky prompt</button>
+          <button type="button" title="Send">Send</button>
+        </div>
+      </section>
+    </main>
+    <script>
+      const examples = {
+        stripe: "Production Stripe live key sk_live_FAKEstripeKey1234567890 failed for jane@example.com on invoice $12,430",
+        database: "Production database postgres://admin:fakepass@db.example.com:5432/app failed during checkout.",
+        jwt: "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiYWRtaW4iOnRydWV9.FAKEsignatureValue1234567890abcdef",
+        configured: "Project Sundial failed for Acme Retail after the private roadmap review."
+      };
+      document.addEventListener("click", (event) => {
+        const fill = event.target.dataset.fill;
+        const fillEditable = event.target.dataset.fillEditable;
+        if (fill) {
+          const prompt = document.querySelector("#prompt");
+          prompt.value = examples[fill];
+          prompt.dispatchEvent(new InputEvent("input", { bubbles: true, data: prompt.value }));
+        }
+        if (fillEditable) {
+          const editable = document.querySelector("#editable");
+          editable.textContent = examples[fillEditable];
+          editable.dispatchEvent(new InputEvent("input", { bubbles: true, data: editable.textContent }));
+        }
+      });
+    </script>
+  </body>
+</html>

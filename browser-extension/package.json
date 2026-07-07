@@ -1,0 +1,6 @@
+{
+  "scripts": {
+    "test": "node tests/engine.test.mjs"
+  },
+  "type": "module"
+}

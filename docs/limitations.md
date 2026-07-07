@@ -18,7 +18,7 @@ PromptGuard helps reduce sensitive-data exposure but does not guarantee privacy,
 - Compose mode creates a temporary local file while editing and deletes it afterward, but OS or editor backups may exist depending on editor behavior.
 - PromptGuard does not control third-party editor behavior.
 - Medium-risk warnings may still allow the raw prompt to proceed unless policy blocks them.
-- Live highlighting while typing is not part of Milestone 1.
+- Browser live protection is best-effort and depends on page DOM structure. Inline highlighting is conservative to avoid breaking controlled editors.
 
 ## Operational Guidance
 

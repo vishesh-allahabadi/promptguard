@@ -176,6 +176,30 @@ promptguard safe --text "Email jane@example.com" --fail-on-block
 
 PromptGuard cannot protect prompts sent directly to an AI tool unless a pre-submit hook or wrapper is installed, enabled, trusted, and actually runs.
 
+## Browser Extension: Live Prompt Protection
+
+PromptGuard includes a browser extension prototype that scans prompt text locally while you type in supported browser text boxes. It shows risk warnings, detected categories, masked previews, and can anonymise the prompt before sending.
+
+Load it as an unpacked Chrome, Edge, or Chromium extension:
+
+1. Open `chrome://extensions` or `edge://extensions`.
+2. Enable Developer Mode.
+3. Click **Load unpacked**.
+4. Select the `browser-extension` folder.
+5. Open `browser-extension/demo/test_page.html` or a supported AI site.
+6. Type a fake risky prompt.
+7. Click **Anonymise Prompt** before sending.
+
+The extension is best effort. Dynamic web apps can change DOM structure and send behavior. PromptGuard cannot guarantee every send path is intercepted. Use the Codex hook or local workflows for stronger pre-submit enforcement where available.
+
+Run the extension engine tests:
+
+```bash
+npm --prefix browser-extension test
+```
+
+See `docs/browser_extension.md` for details.
+
 ## Example
 
 Input:
