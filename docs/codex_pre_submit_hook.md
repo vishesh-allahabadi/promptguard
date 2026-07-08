@@ -20,13 +20,19 @@ PromptGuard does not store raw prompts permanently, does not call external APIs,
 
 ## Install
 
-From the repo root:
+From the repo root, install for the current repo:
 
 ```bash
 promptguard install-codex-hook
 ```
 
-Codex may require you to review and trust the hook using `/hooks` before it runs.
+For all new Codex chats and repos on the machine, install at user scope:
+
+```bash
+promptguard install-codex-hook --scope user
+```
+
+Codex may require you to review and trust the hook using `/hooks` before it runs. User-scope hooks are loaded from `~/.codex` and remain independent of project trust.
 
 ## Manual Install
 
@@ -73,7 +79,30 @@ confidential_terms:
   - Project Sundial
 client_names:
   - Acme Retail
+bypass:
+  enabled: true
+  allow_levels:
+    - LOW
+    - MEDIUM
+    - HIGH
+  require_confirmation_for:
+    - HIGH
+    - CRITICAL
+  allow_critical_bypass: false
+  audit_log: true
 ```
+
+## One-Time Bypass
+
+Blocked prompts show clear actions: use the safe rewritten prompt, bypass once if local policy permits the detected risk level, or edit `.promptguard.yml` if the policy should change.
+
+Bypass is scoped to the current hook invocation. It does not persist and does not modify policy settings.
+
+CRITICAL bypass is disabled by default because CRITICAL findings commonly include raw credentials, private keys, database URLs, or other data that should not be casually sent to an AI tool. To allow CRITICAL bypass, set `allow_critical_bypass: true` and include `CRITICAL` in `bypass.allow_levels`.
+
+HIGH and CRITICAL bypass require the confirmation phrase `BYPASS`. The confirmation prompt should make clear that the prompt may contain sensitive data.
+
+When `bypass.audit_log` is enabled, PromptGuard writes local metadata to `.promptguard/audit.log`: timestamp, risk level, detected categories, action, SHA-256 prompt hash, and available hook context. It does not log raw prompts or secrets.
 
 You can also point the hook to a config file:
 
@@ -83,10 +112,34 @@ PROMPTGUARD_CONFIG=/path/to/config.yml
 
 ## Safe Test
 
-Use fake values only:
+Use generated fake values only:
 
 ```bash
-echo '{"hook_event_name":"UserPromptSubmit","prompt":"OPENAI_API_KEY=sk-FAKEopenaiKey1234567890abcd","cwd":"/tmp","session_id":"s1","turn_id":"t1","permission_mode":"default","model":"test"}' | python .codex/hooks/promptguard_user_prompt_submit.py
+python - <<'PY'
+import json
+import subprocess
+
+fake_key = "s" + "k-" + "proj-" + "FAKE1234567890abcdefghijklmnop"
+event = {
+    "hook_event_name": "UserPromptSubmit",
+    "prompt": "OPENAI_API_KEY=" + fake_key,
+    "cwd": "/tmp",
+    "session_id": "s1",
+    "turn_id": "t1",
+    "permission_mode": "default",
+    "model": "test",
+}
+
+result = subprocess.run(
+    ["python", ".codex/hooks/promptguard_user_prompt_submit.py"],
+    input=json.dumps(event),
+    text=True,
+    capture_output=True,
+    check=False,
+)
+print(result.stdout.replace(fake_key, "[GENERATED_FAKE_SECRET_REDACTED]"))
+print(result.stderr.replace(fake_key, "[GENERATED_FAKE_SECRET_REDACTED]"))
+PY
 ```
 
 Expected: JSON stdout with `decision: block`, a reason containing `[SECRET_REMOVED]`, and no raw fake key.

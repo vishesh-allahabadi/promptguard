@@ -11,6 +11,14 @@ def test_cli_scan_returns_nonzero_for_critical(capsys) -> None:
     assert "action: block" in output
 
 
+def test_cli_scan_accepts_positional_prompt(capsys) -> None:
+    key = "s" + "k-" + "proj-" + "FAKE1234567890abcdefghijklmnop"
+    code = main(["scan", "Here is a generated key: " + key])
+    output = capsys.readouterr().out
+    assert code == 1
+    assert "risk: CRITICAL" in output
+
+
 def test_cli_anonymize_returns_safe_text(capsys) -> None:
     code = main(["anonymize", "--text", "Email jane@example.com about invoice $12,430"])
     output = capsys.readouterr().out
@@ -33,4 +41,3 @@ def test_cli_test_examples_passes(capsys) -> None:
     output = capsys.readouterr().out
     assert code == 0
     assert "passed" in output
-

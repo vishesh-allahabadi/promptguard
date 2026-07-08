@@ -251,12 +251,26 @@ Install the repo-local hook:
 promptguard install-codex-hook
 ```
 
-Then in Codex, review and trust the hook if prompted, or run `/hooks`. The hook only works when Codex hooks are installed, enabled, trusted, and actually executed for this repo/config layer.
+Install the user-global hook for new Codex chats and repos on this machine:
 
-Test safely with a fake secret prompt:
+```bash
+promptguard install-codex-hook --scope user
+```
 
-```text
-OPENAI_API_KEY=sk-FAKEopenaiKey1234567890abcd
+Then in Codex, review and trust the hook if prompted, or run `/hooks`. The hook only works when Codex hooks are installed, enabled, trusted, and actually executed for the relevant config layer.
+
+Test safely with a generated fake secret prompt:
+
+```bash
+python - <<'PY'
+import subprocess
+
+fake_key = "s" + "k-" + "proj-" + "FAKE1234567890abcdefghijklmnop"
+prompt = "OPENAI_API_KEY=" + fake_key
+result = subprocess.run(["promptguard", "scan", "--text", prompt], text=True, capture_output=True, check=False)
+print(result.stdout.replace(fake_key, "[GENERATED_FAKE_SECRET_REDACTED]"))
+print(result.stderr.replace(fake_key, "[GENERATED_FAKE_SECRET_REDACTED]"))
+PY
 ```
 
 Expected behavior: PromptGuard blocks the prompt before submission and shows a safe rewritten version containing `[SECRET_REMOVED]`.
@@ -275,7 +289,34 @@ confidential_terms:
   - Project Sundial
 client_names:
   - Acme Retail
+bypass:
+  enabled: true
+  allow_levels:
+    - LOW
+    - MEDIUM
+    - HIGH
+  require_confirmation_for:
+    - HIGH
+    - CRITICAL
+  allow_critical_bypass: false
+  audit_log: true
 ```
+
+## One-Time Bypass
+
+When the Codex hook blocks a prompt, it shows three actions:
+
+1. Use the safe rewritten prompt.
+2. Bypass once, if your local policy allows that risk level.
+3. Edit `.promptguard.yml` if the policy itself should change.
+
+Bypass is one-time only. A bypass request applies to the current prompt execution and does not change `block_on`, `warn_on`, or any other policy setting.
+
+CRITICAL bypass is disabled by default because CRITICAL findings usually mean raw secrets, credential URLs, private keys, or similarly high-impact data. To allow it, the config must include `CRITICAL` in `bypass.allow_levels` and set `bypass.allow_critical_bypass: true`.
+
+For HIGH or CRITICAL risk, the user must confirm by typing exactly `BYPASS`. The confirmation copy warns that the prompt may contain sensitive data.
+
+If `bypass.audit_log` is enabled, PromptGuard appends local JSONL metadata to `.promptguard/audit.log`. The audit log stores timestamp, risk level, detected categories, action, SHA-256 prompt hash, and available hook context. It does not store raw prompts or secrets. `.promptguard/` is ignored by git.
 
 ## Hook Usage
 
@@ -289,6 +330,8 @@ Hook templates are included for Codex and Claude Code:
 Exact hook schemas can change. Treat these files as local templates and adapt paths for your installed Codex or Claude Code version.
 
 See `docs/codex_pre_submit_hook.md` for the production-oriented Codex hook details.
+
+For a GitHub-ready Codex and Claude Code installation guide, see `docs/coding-agent-hooks.md`. For a reusable agent prompt that installs and verifies PromptGuard safely, see `prompts/install-promptguard-for-coding-agents.md`.
 
 ## Skill Usage
 

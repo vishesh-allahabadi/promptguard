@@ -10,4 +10,14 @@ client_names:
 confidential_terms:
   - Project Sundial
   - board-only pricing
-
+bypass:
+  enabled: true
+  allow_levels:
+    - LOW
+    - MEDIUM
+    - HIGH
+  require_confirmation_for:
+    - HIGH
+    - CRITICAL
+  allow_critical_bypass: false
+  audit_log: true

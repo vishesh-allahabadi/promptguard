@@ -20,10 +20,20 @@ class Action(str, Enum):
 
 
 @dataclass(frozen=True)
+class BypassConfig:
+    enabled: bool = False
+    allow_levels: tuple[RiskLevel, ...] = ()
+    require_confirmation_for: tuple[RiskLevel, ...] = ()
+    allow_critical_bypass: bool = False
+    audit_log: bool = False
+
+
+@dataclass(frozen=True)
 class PromptGuardConfig:
     mode: str | None = None
     block_on: tuple[RiskLevel, ...] = ()
     warn_on: tuple[RiskLevel, ...] = ()
+    bypass: BypassConfig = field(default_factory=BypassConfig)
     customer_names: tuple[str, ...] = ()
     company_names: tuple[str, ...] = ()
     client_names: tuple[str, ...] = ()

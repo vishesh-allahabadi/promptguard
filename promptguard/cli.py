@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +39,22 @@ if __name__ == "__main__":
     raise SystemExit(main())
 '''
 
+USER_HOOK_WRAPPER = '''#!/usr/bin/env python3
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+PACKAGE_ROOT = Path({package_root!r})
+if PACKAGE_ROOT.exists():
+    sys.path.insert(0, str(PACKAGE_ROOT))
+
+from promptguard.codex_hook import main
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+'''
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="promptguard", description="Local prompt sensitive-data scanner.")
@@ -47,7 +64,8 @@ def main(argv: list[str] | None = None) -> int:
 
     for command in ("scan", "anonymize"):
         sub = subparsers.add_parser(command)
-        source = sub.add_mutually_exclusive_group(required=True)
+        sub.add_argument("text_arg", nargs="?")
+        source = sub.add_mutually_exclusive_group()
         source.add_argument("--text")
         source.add_argument("--file")
 
@@ -72,11 +90,17 @@ def main(argv: list[str] | None = None) -> int:
     compose.add_argument("--fail-on-block", action="store_true", help="Exit non-zero when policy blocks the prompt.")
 
     check = subparsers.add_parser("check")
-    check.add_argument("--file", required=True)
+    check.add_argument("--file")
 
     subparsers.add_parser("test-examples")
-    subparsers.add_parser("install-codex-hook")
-    subparsers.add_parser("doctor")
+    install = subparsers.add_parser("install-codex-hook")
+    install.add_argument("--scope", choices=("repo", "user"), default="repo")
+    install.add_argument("--codex-home", help="Override CODEX_HOME for user-scope installs and tests.")
+    install.add_argument("--package-root", help="PromptGuard source root for user-scope hook imports.")
+
+    doctor = subparsers.add_parser("doctor")
+    doctor.add_argument("--scope", choices=("repo", "user"), default="repo")
+    doctor.add_argument("--codex-home", help="Override CODEX_HOME for user-scope checks.")
 
     args = parser.parse_args(argv)
     config = load_config(args.config)
@@ -94,10 +118,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "check":
-        text = Path(args.file).read_text(encoding="utf-8")
-        result = anonymize_text(text, config)
-        _print_payload(result.to_dict(), args.json)
-        return 1 if result.scan.risk_level is RiskLevel.CRITICAL else 0
+        if args.file:
+            text = Path(args.file).read_text(encoding="utf-8")
+            result = anonymize_text(text, config)
+            _print_payload(result.to_dict(), args.json)
+            return 1 if result.scan.risk_level is RiskLevel.CRITICAL else 0
+        return _check_installation(args.json)
 
     if args.command == "safe":
         workflow_config = load_local_workflow_config(args.config)
@@ -137,10 +163,17 @@ def main(argv: list[str] | None = None) -> int:
         return _test_examples(config, args.json)
 
     if args.command == "install-codex-hook":
-        return _install_codex_hook()
+        return _install_codex_hook(
+            scope=args.scope,
+            codex_home=Path(args.codex_home).expanduser() if args.codex_home else None,
+            package_root=Path(args.package_root).expanduser() if args.package_root else None,
+        )
 
     if args.command == "doctor":
-        return _doctor()
+        return _doctor(
+            scope=args.scope,
+            codex_home=Path(args.codex_home).expanduser() if args.codex_home else None,
+        )
 
     return 2
 
@@ -148,7 +181,11 @@ def main(argv: list[str] | None = None) -> int:
 def _read_source(args: argparse.Namespace) -> str:
     if args.text is not None:
         return args.text
-    return Path(args.file).read_text(encoding="utf-8")
+    if args.file is not None:
+        return Path(args.file).read_text(encoding="utf-8")
+    if getattr(args, "text_arg", None) is not None:
+        return args.text_arg
+    raise SystemExit("scan/anonymize requires --text, --file, or a prompt argument")
 
 
 def _read_safe_source(args: argparse.Namespace) -> str:
@@ -246,15 +283,32 @@ def _test_examples(config: PromptGuardConfig, as_json: bool) -> int:
     return 1 if failures else 0
 
 
-def _install_codex_hook() -> int:
-    root = _git_root(Path.cwd())
-    codex_dir = root / ".codex"
+def _install_codex_hook(
+    *,
+    scope: str = "repo",
+    codex_home: Path | None = None,
+    package_root: Path | None = None,
+) -> int:
+    if scope == "user":
+        root = _codex_home(codex_home)
+        codex_dir = root
+    else:
+        root = _git_root(Path.cwd())
+        codex_dir = root / ".codex"
     hooks_dir = codex_dir / "hooks"
     hooks_json = codex_dir / "hooks.json"
     hook_path = hooks_dir / "promptguard_user_prompt_submit.py"
 
     hooks_dir.mkdir(parents=True, exist_ok=True)
-    hook_path.write_text(HOOK_WRAPPER, encoding="utf-8")
+    backups: list[Path] = []
+    backups.extend(_backup_if_exists(hook_path))
+    backups.extend(_backup_if_exists(hooks_json))
+
+    if scope == "user":
+        source_root = (package_root or Path(__file__).resolve().parent.parent).resolve()
+        hook_path.write_text(USER_HOOK_WRAPPER.format(package_root=str(source_root)), encoding="utf-8")
+    else:
+        hook_path.write_text(HOOK_WRAPPER, encoding="utf-8")
     hook_path.chmod(0o755)
 
     data: dict[str, Any] = {}
@@ -265,7 +319,10 @@ def _install_codex_hook() -> int:
             data = {}
     hooks = data.setdefault("hooks", {})
     prompt_hooks = hooks.setdefault("UserPromptSubmit", [])
-    command = '/usr/bin/env python3 "$(git rev-parse --show-toplevel)/.codex/hooks/promptguard_user_prompt_submit.py"'
+    if scope == "user":
+        command = f'/usr/bin/env python3 "{hook_path}"'
+    else:
+        command = '/usr/bin/env python3 "$(git rev-parse --show-toplevel)/.codex/hooks/promptguard_user_prompt_submit.py"'
     hook_entry = {
         "type": "command",
         "command": command,
@@ -281,30 +338,137 @@ def _install_codex_hook() -> int:
         prompt_hooks.append({"hooks": [hook_entry]})
     hooks_json.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
+    config_backups = _ensure_hooks_enabled(codex_dir / "config.toml") if scope == "user" else []
+    backups.extend(config_backups)
+
     print(f"Installed PromptGuard Codex hook at {hook_path}")
     print(f"Updated {hooks_json}")
+    if backups:
+        print("Backups:")
+        for backup in backups:
+            print(f"- {backup}")
     print("Codex may require you to review and trust this hook using /hooks before it runs.")
-    print("This protects only prompts submitted through Codex in this repo/config layer when hooks are enabled and trusted.")
+    if scope == "user":
+        print("This protects prompts submitted through Codex from user config layers when hooks are enabled and trusted.")
+    else:
+        print("This protects only prompts submitted through Codex in this repo/config layer when hooks are enabled and trusted.")
     return 0
 
 
-def _doctor() -> int:
-    root = _git_root(Path.cwd())
-    hooks_json = root / ".codex" / "hooks.json"
-    hook_path = root / ".codex" / "hooks" / "promptguard_user_prompt_submit.py"
-    config_path = root / ".promptguard.yml"
+def _doctor(*, scope: str = "repo", codex_home: Path | None = None) -> int:
+    if scope == "user":
+        root = _codex_home(codex_home)
+        hooks_json = root / "hooks.json"
+        hook_path = root / "hooks" / "promptguard_user_prompt_submit.py"
+        config_path = root / "config.toml"
+    else:
+        root = _git_root(Path.cwd())
+        hooks_json = root / ".codex" / "hooks.json"
+        hook_path = root / ".codex" / "hooks" / "promptguard_user_prompt_submit.py"
+        config_path = root / ".promptguard.yml"
     print("PromptGuard doctor")
+    print(f"scope: {scope}")
     print(f"version: {_version()}")
     print(f"python_executable: {sys.executable}")
     print(f"python_version: {sys.version.split()[0]}")
     print(f"cwd: {Path.cwd()}")
-    print(f"repo_root: {root}")
+    print(f"{'codex_home' if scope == 'user' else 'repo_root'}: {root}")
     print(f"hooks_json_exists: {hooks_json.exists()}")
     print(f"hook_script_exists: {hook_path.exists()}")
-    print(f"promptguard_config_exists: {config_path.exists()}")
+    if scope == "user":
+        print(f"config_toml_exists: {config_path.exists()}")
+        print(f"hooks_feature_state: {_hooks_feature_state(config_path)}")
+    else:
+        print(f"promptguard_config_exists: {config_path.exists()}")
     print(f"hook_files_present: {hooks_json.exists() and hook_path.exists()}")
     print("Codex may require you to review and trust this hook using /hooks before it runs.")
     return 0 if hooks_json.exists() and hook_path.exists() else 1
+
+
+def _check_installation(as_json: bool) -> int:
+    repo_root = _git_root(Path.cwd())
+    user_home = _codex_home(None)
+    payload = {
+        "repo_hook_files_present": (repo_root / ".codex" / "hooks.json").exists()
+        and (repo_root / ".codex" / "hooks" / "promptguard_user_prompt_submit.py").exists(),
+        "user_hook_files_present": (user_home / "hooks.json").exists()
+        and (user_home / "hooks" / "promptguard_user_prompt_submit.py").exists(),
+        "user_hooks_feature_state": _hooks_feature_state(user_home / "config.toml"),
+    }
+    _print_payload(payload, as_json)
+    return 0 if payload["repo_hook_files_present"] or payload["user_hook_files_present"] else 1
+
+
+def _codex_home(codex_home: Path | None) -> Path:
+    if codex_home is not None:
+        return codex_home
+    return Path(os.environ.get("CODEX_HOME", "~/.codex")).expanduser()
+
+
+def _backup_if_exists(path: Path) -> list[Path]:
+    if not path.exists():
+        return []
+    backup = path.with_name(f"{path.name}.bak.{_timestamp()}")
+    shutil.copy2(path, backup)
+    return [backup]
+
+
+def _timestamp() -> str:
+    return datetime.now().strftime("%Y%m%d%H%M%S")
+
+
+def _ensure_hooks_enabled(config_path: Path) -> list[Path]:
+    if not config_path.exists():
+        return []
+    raw = config_path.read_text(encoding="utf-8")
+    updated = _replace_disabled_hooks_feature(raw)
+    if updated == raw:
+        return []
+    backups = _backup_if_exists(config_path)
+    config_path.write_text(updated, encoding="utf-8")
+    return backups
+
+
+def _replace_disabled_hooks_feature(raw: str) -> str:
+    lines = raw.splitlines(keepends=True)
+    in_features = False
+    changed = False
+    output: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            in_features = stripped == "[features]"
+        if in_features:
+            for key in ("hooks", "codex_hooks"):
+                if stripped.startswith(f"{key}") and "=" in stripped:
+                    name, value = line.split("=", 1)
+                    if value.strip().lower().startswith("false"):
+                        line = f"{name}= true\n"
+                        changed = True
+                    break
+        output.append(line)
+    return "".join(output) if changed else raw
+
+
+def _hooks_feature_state(config_path: Path) -> str:
+    if not config_path.exists():
+        return "default_enabled"
+    raw = config_path.read_text(encoding="utf-8")
+    in_features = False
+    state = "default_enabled"
+    for line in raw.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            in_features = stripped == "[features]"
+            continue
+        if not in_features or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        key = key.strip()
+        value = value.strip().lower()
+        if key in {"hooks", "codex_hooks"}:
+            state = "enabled" if value.startswith("true") else "disabled" if value.startswith("false") else "unknown"
+    return state
 
 
 def _git_root(cwd: Path) -> Path:

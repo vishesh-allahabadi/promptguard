@@ -182,6 +182,17 @@ PII_RULES: tuple[PatternRule, ...] = (
     ),
 )
 
+PROMPT_INJECTION_RULES: tuple[PatternRule, ...] = (
+    PatternRule(
+        "prompt_injection",
+        "Instruction override or hidden prompt disclosure attempt",
+        r"\b(?:(?:ignore|disregard)\s+(?:all\s+)?(?:previous|prior|above|earlier)\s+instructions?\b.*\b(?:reveal|show|print|display|share|provide)\b.*\b(?:hidden\s+)?(?:system|developer|internal)\s+(?:prompt|message|instructions?)\b|forget\s+(?:your\s+)?(?:prior|previous|original)\s+(?:rules|instructions?)\b.*\b(?:reveal|show|print|display|share|provide)\b.*\b(?:hidden\s+)?(?:system|developer|internal)\s+(?:prompt|message|instructions?)\b|you\s+are\s+no\s+longer\s+bound\s+by\s+your\s+(?:original|prior|previous)\s+(?:instructions?|rules)\b|(?:print|reveal|show|display|share|provide)\s+(?:your\s+)?(?:hidden|system|developer|internal)\s+(?:prompt|message|instructions?))",
+        RiskLevel.HIGH,
+        "[PROMPT_INJECTION_REMOVED]",
+        re.IGNORECASE | re.DOTALL,
+    ),
+)
+
 CONTEXT_RULES: tuple[PatternRule, ...] = (
     PatternRule(
         "production_indicator",
@@ -238,7 +249,7 @@ VALUE_RULES: tuple[PatternRule, ...] = (
     ),
 )
 
-ALL_RULES: tuple[PatternRule, ...] = SECRET_RULES + PII_RULES + CONTEXT_RULES + VALUE_RULES
+ALL_RULES: tuple[PatternRule, ...] = SECRET_RULES + PII_RULES + PROMPT_INJECTION_RULES + CONTEXT_RULES + VALUE_RULES
 
 
 def configured_rules(config: PromptGuardConfig | None) -> tuple[PatternRule, ...]:

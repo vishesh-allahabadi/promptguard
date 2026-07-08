@@ -17,6 +17,10 @@ def _event(prompt: str) -> str:
     )
 
 
+def _generated_key() -> str:
+    return "s" + "k-" + "FAKEopenaiKey1234567890abcd"
+
+
 def test_low_prompt_allows_with_empty_stdout(capsys) -> None:
     code = main(_event("How do I refactor this harmless Python function?"))
     captured = capsys.readouterr()
@@ -25,7 +29,7 @@ def test_low_prompt_allows_with_empty_stdout(capsys) -> None:
 
 
 def test_critical_prompt_blocks_without_raw_secret(capsys) -> None:
-    raw_key = "sk-FAKEopenaiKey1234567890abcd"
+    raw_key = _generated_key()
     code = main(_event(f"OPENAI_API_KEY={raw_key}"))
     payload = json.loads(capsys.readouterr().out)
     assert code == 0
@@ -83,11 +87,10 @@ warn_on:
 
 
 def test_plain_text_fallback_blocks_without_raw_secret(capsys) -> None:
-    raw_key = "sk-FAKEopenaiKey1234567890abcd"
+    raw_key = _generated_key()
     code = main(f"OPENAI_API_KEY={raw_key}")
     payload = json.loads(capsys.readouterr().out)
     assert code == 0
     assert payload["decision"] == "block"
     assert "[SECRET_REMOVED]" in payload["reason"]
     assert raw_key not in payload["reason"]
-

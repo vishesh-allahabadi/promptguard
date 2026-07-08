@@ -43,8 +43,33 @@ client_names:
     assert config.client_names == ("Acme Retail",)
 
 
+def test_load_config_supports_bypass_fields(tmp_path) -> None:
+    path = tmp_path / ".promptguard.yml"
+    path.write_text(
+        """
+bypass:
+  enabled: true
+  allow_levels:
+    - LOW
+    - MEDIUM
+    - HIGH
+  require_confirmation_for:
+    - HIGH
+    - CRITICAL
+  allow_critical_bypass: false
+  audit_log: true
+""",
+        encoding="utf-8",
+    )
+    config = load_config(path)
+    assert config.bypass.enabled is True
+    assert config.bypass.allow_levels == (RiskLevel.LOW, RiskLevel.MEDIUM, RiskLevel.HIGH)
+    assert config.bypass.require_confirmation_for == (RiskLevel.HIGH, RiskLevel.CRITICAL)
+    assert config.bypass.allow_critical_bypass is False
+    assert config.bypass.audit_log is True
+
+
 def test_hook_policy_defaults() -> None:
     config = load_config(None)
     assert effective_block_on(config) == (RiskLevel.CRITICAL, RiskLevel.HIGH)
     assert effective_warn_on(config) == (RiskLevel.MEDIUM,)
-
