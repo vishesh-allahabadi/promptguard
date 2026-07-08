@@ -75,6 +75,75 @@ For development:
 python -m pip install -e ".[dev]"
 ```
 
+## Install PromptGuard on Codex / Claude Code
+
+PromptGuard can be installed as a coding-agent pre-submit hook so prompts are scanned before they are sent to Codex, Claude Code, or another agent. The hook blocks risky prompts, rewrites sensitive prompts with safe placeholders, and can support controlled one-time bypass for `LOW`, `MEDIUM`, and `HIGH` risks when enabled.
+
+`CRITICAL` bypass is disabled by default. Audit logs store metadata and prompt hashes only, not raw prompts or secrets.
+
+For the full Codex and Claude Code hook guide, see `docs/coding-agent-hooks.md`.
+
+### Copy-paste setup prompt
+
+Paste this into Codex or Claude Code from inside your project repository:
+
+````text
+Install PromptGuard as a pre-submit safety hook for this coding agent.
+
+Requirements:
+- Detect and block sensitive data before prompts are sent.
+- Rewrite unsafe prompts by replacing secrets with safe placeholders.
+- Do not log raw prompts or secrets.
+- Store audit logs with metadata and prompt hashes only.
+- Keep local policy in `.promptguard.yml`.
+- Keep `.promptguard/audit.log` ignored by git.
+- Enable controlled one-time bypass for LOW, MEDIUM, and HIGH risks only.
+- Keep CRITICAL bypass disabled by default.
+- After installation, run the test suite or the closest available verification command.
+- Show me the exact files changed and the final hook status.
+
+Use this safer default config:
+
+```yaml
+bypass:
+  enabled: true
+  allow_levels:
+    - LOW
+    - MEDIUM
+    - HIGH
+  require_confirmation_for:
+    - HIGH
+    - CRITICAL
+  allow_critical_bypass: false
+  audit_log: true
+```
+
+Do not push anything to remote.
+````
+
+### Recommended default bypass policy
+
+With bypass enabled, `LOW`, `MEDIUM`, and `HIGH` findings may be bypassed once if the local policy allows that risk level. `HIGH` requires the user to type exactly `BYPASS`.
+
+`CRITICAL` findings remain blocked unless a user explicitly opts into critical bypass. The recommended setting is:
+
+```yaml
+allow_critical_bypass: false
+```
+
+### Audit log safety
+
+The audit log path is `.promptguard/audit.log`, and it should be ignored by git. Audit logs should contain metadata only:
+
+- timestamp
+- risk level
+- categories
+- action
+- prompt hash
+- tool/context if available
+
+Audit logs must not contain raw prompt text or secrets.
+
 ## CLI Usage
 
 Scan text:
