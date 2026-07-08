@@ -90,7 +90,11 @@ Paste this into Codex or Claude Code from inside your project repository:
 ````text
 Install PromptGuard as a pre-submit safety hook for this coding agent.
 
+PromptGuard source:
+https://github.com/vishesh-allahabadi/promptguard
+
 Requirements:
+- If PromptGuard is not already installed, clone or install it from the source repository above.
 - Detect and block sensitive data before prompts are sent.
 - Rewrite unsafe prompts by replacing secrets with safe placeholders.
 - Do not log raw prompts or secrets.
